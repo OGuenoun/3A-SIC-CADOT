@@ -70,7 +70,7 @@ def annotation_distribution(json,plot=False):
 
 current_wd = os.getcwd()
 train_dir=os.path.join(current_wd,"train\\")
-annotations_dir = os.path.join(train_dir,"_annotations.coco.json")
+annotations_dir = os.path.join(current_wd,"annotations_train_augmented.json")
 with open(annotations_dir, "r") as f:
     annotations=json.load(f)
 images=[]

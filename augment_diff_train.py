@@ -10,7 +10,7 @@ import torch.nn.functional as F
 import torch.nn as nn
 
 curr_dir=os.getcwd()
-train_dir=os.path.join(curr_dir,"train\\")
+train_dir=os.path.join(curr_dir,"data_coco/train/")
 COCO_JSON=os.path.join(train_dir,"_annotations.coco.json")
 IMAGES_DIR = train_dir
 NUM_CLASSES = 14

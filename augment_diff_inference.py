@@ -2,6 +2,7 @@ import os, json, torch
 import numpy as np
 from tqdm import tqdm
 from PIL import Image
+from collections import Counter
 from diffusers import DDPMScheduler
 from augment_diff_train import build_unet, IMAGE_SIZE, NUM_CLASSES
 
@@ -12,7 +13,7 @@ COCO_IN=os.path.join(train_dir,"_annotations.coco.json")
 OUT_JSON  = "annotations_augmented.json"
 OUT_DIR   = "generated_images"
 
-NUM_SAMPLES_PER_BBOX = 3    
+NUM_SAMPLES_PER_BBOX = 100    
 DEVICE="cuda"
 unet = build_unet()
 unet.load_state_dict(torch.load(MODEL_PATH))
@@ -34,13 +35,23 @@ os.makedirs(OUT_DIR, exist_ok=True)
 next_img_id = max(images.keys())+1
 next_ann_id = max(a["id"] for a in coco["annotations"])+1
 
+cat_counts = Counter(a["category_id"] for a in coco["annotations"])
+max_count = max(cat_counts.values())
+target = {cid: max_count for cid in cat_counts}
+missing = {cid: max(0, target[cid] - cat_counts[cid]) for cid in cat_counts}
+under_cats = {cid for cid, m in missing.items() if m > 0}
+
 
 # GENERATE  IMAGES
 
-for img_id, img_info in tqdm(images.items()):
+for img_id, img_info in tqdm(images.items(),desc="Generating for underrepresented classes"):
 
     for ann in anns_by_img.get(img_id, []):
         cid = ann["category_id"]
+        if cid not in under_cats:
+                continue
+        if missing.get(cid, 0) <= 0:
+                continue
         x,y,w,h = ann["bbox"]
         
         cond = torch.zeros(NUM_CLASSES, IMAGE_SIZE, IMAGE_SIZE)

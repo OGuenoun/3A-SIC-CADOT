@@ -125,7 +125,7 @@ def bbox_iou_coco(box1, box2):
         ious.append(iou)
     return max(ious) if ious else 0.0
 
-def make_soft_rect_mask(h, w, edge_frac=0.15):
+def make_soft_rect_mask(h, w, edge_frac=0.10):
 
     y = np.linspace(-1.0, 1.0, h)[:, None]
     x = np.linspace(-1.0, 1.0, w)[None, :]
@@ -147,7 +147,7 @@ def make_soft_rect_mask(h, w, edge_frac=0.15):
     mask = mx * my 
     return mask.astype(np.float32)
 
-def paste_rect_smooth(bg, patch, x, y, edge_frac=0.15):
+def paste_rect_smooth(bg, patch, x, y, edge_frac=0.10):
 
     ph, pw = patch.shape[:2]
     H, W   = bg.shape[:2]
@@ -197,7 +197,7 @@ def place_patch_on_image(img, patch, existing_bboxes, max_tries=50, max_iou=0.2)
             iou = bbox_iou_coco(candidate_bbox, existing_bboxes)
             if iou > max_iou:
                 continue
-        new_img = paste_rect_smooth(img, patch, x, y, edge_frac=0.15)
+        new_img = paste_rect_smooth(img, patch, x, y, edge_frac=0.10)
 
         return new_img, candidate_bbox
 
@@ -284,7 +284,7 @@ def transform_background(img, anns_for_img):
         img_rot = np.clip(img_f, 0, 255).astype(np.uint8)
 
     return img_rot, new_anns, new_W, new_H
-def compute_targets(coco, min_per_class=None, balance_factor=1.0):
+def compute_targets(coco, min_per_class=None, balance_factor=0.2):
     """
     Compute current counts and target count per class.
     - If min_per_class is given, target[cid] = max(current, min_per_class).
@@ -471,11 +471,11 @@ coco_aug = augment_by_patching_targeted(
     coco,
     images_dir=images_dir,
     out_images_dir=out_images_dir,
-    min_per_class=7000,          # target examples per class
+    min_per_class=1000,          # target examples per class
     max_bboxes_per_image=10,    # 'few objects' threshold for backgrounds
-    patches_per_image=10,        # how many patches to try per background
+    patches_per_image=7,        # how many patches to try per background
     max_patches_per_cat=200,
-    iou_threshold=0.2,
+    iou_threshold=0.1,
     min_scale=0.5,
     max_scale=1.5,
     max_rounds=10,

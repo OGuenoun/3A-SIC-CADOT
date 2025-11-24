@@ -4,6 +4,8 @@ from tqdm import tqdm
 from PIL import Image
 from collections import Counter
 from diffusers import DDPMScheduler
+from diffusers import DDIMScheduler
+
 from augment_diff_train import build_unet, IMAGE_SIZE, NUM_CLASSES
 
 MODEL_PATH = "bbox_guided_ddpm.pth"
@@ -13,13 +15,14 @@ COCO_IN=os.path.join(train_dir,"_annotations.coco.json")
 OUT_JSON  = "annotations_augmented.json"
 OUT_DIR   = "generated_images"
 
-NUM_SAMPLES_PER_BBOX = 100    
+NUM_SAMPLES_PER_BBOX = 10    
 DEVICE="cuda"
 unet = build_unet()
 unet.load_state_dict(torch.load(MODEL_PATH))
 unet.to(DEVICE).eval()
 
-sched = DDPMScheduler(num_train_timesteps=1000)
+sched = DDIMScheduler(num_train_timesteps=1000)
+sched.set_timesteps(50) 
 
 with open(COCO_IN,"r") as f:
     coco = json.load(f)
@@ -37,7 +40,7 @@ next_ann_id = max(a["id"] for a in coco["annotations"])+1
 
 cat_counts = Counter(a["category_id"] for a in coco["annotations"])
 max_count = max(cat_counts.values())
-target = {cid: max_count for cid in cat_counts}
+target = {cid: max_count*0.2 for cid in cat_counts}
 missing = {cid: max(0, target[cid] - cat_counts[cid]) for cid in cat_counts}
 under_cats = {cid for cid, m in missing.items() if m > 0}
 

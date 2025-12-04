@@ -22,7 +22,7 @@ unet.load_state_dict(torch.load(MODEL_PATH))
 unet.to(DEVICE).eval()
 
 sched = DDIMScheduler(num_train_timesteps=1000)
-sched.set_timesteps(50) 
+sched.set_timesteps(20) 
 
 with open(COCO_IN,"r") as f:
     coco = json.load(f)
@@ -70,7 +70,7 @@ for img_id, img_info in tqdm(images.items(),desc="Generating for underrepresente
         for _ in range(NUM_SAMPLES_PER_BBOX):
             x_t = torch.randn(1,3,IMAGE_SIZE,IMAGE_SIZE).to(DEVICE)
 
-            for t in reversed(range(1000)):
+            for t in reversed(range(20)):
                 tt = torch.tensor([t], device=DEVICE)
                 x_in = torch.cat([x_t, cond], dim=1)
                 eps = unet(x_in, tt).sample
@@ -100,7 +100,7 @@ for img_id, img_info in tqdm(images.items(),desc="Generating for underrepresente
 
             coco["images"].append(new_img)
             coco["annotations"].append(new_ann)
-
+            torch.clear_autocast_cache()
             next_img_id += 1
             next_ann_id += 1
 

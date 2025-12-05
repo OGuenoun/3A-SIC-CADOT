@@ -52,7 +52,7 @@ class COCODataset(Dataset):
 
         for ann in anns:
             x, y, w, h = ann["bbox"]
-            boxes.append([x, y, x + w, y + h])
+            boxes.append([x, y,x+w,x+h])
             labels.append(self.catid2idx[ann["category_id"]])  # +1, 0 reserved for background
             areas.append(ann.get("area", w * h))
             iscrowd.append(ann.get("iscrowd", 0))
@@ -96,14 +96,14 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Using device:", device)
 
-    data_root = "./images_patched"  # change if needed
+    data_root = "/bettik/PROJECTS/pr-material-acceleration/guenouno/data/data_augmented/train/"  # change if needed
 
     train_dataset = COCODataset(
         img_dir=data_root,
         ann_file=os.path.join(data_root, "annotations_train_augmented.json"),
         transforms=get_transform(train=True),
     )
-    val_root="./valid"
+    val_root="/bettik/PROJECTS/pr-material-acceleration/guenouno/data/valid"
     val_dataset = COCODataset(
         img_dir=val_root,
         ann_file=os.path.join(val_root, "_annotations.coco.json"),
@@ -141,7 +141,9 @@ def main():
         model.train()
         epoch_loss = 0.0
 
-        for images, targets in train_loader:
+	batches = 0
+        
+	for images, targets in train_loader:
             images = list(img.to(device) for img in images)
             targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
@@ -149,23 +151,32 @@ def main():
             losses = sum(loss for loss in loss_dict.values())
             loss_value = losses.item()
             epoch_loss += loss_value
-
+	    batches+=1
             optimizer.zero_grad()
             losses.backward()
             optimizer.step()
-
+	avg_train_loss=train_loss/max(batches,1)
         lr_scheduler.step()
-        print(f"Epoch [{epoch+1}/{num_epochs}], loss: {epoch_loss:.4f}")
-
+	val_loss = 0.0
+        val_batches = 0
         # Simple validation loop: just forward & maybe later compute metrics
         model.eval()
         with torch.no_grad():
             for images, targets in val_loader:
                 images = [img.to(device) for img in images]
-                outputs = model(images)
+		targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
+		loss_dict = model(images, targets)
+                losses = sum(loss for loss in loss_dict.values())
+		val_loss += losses.item()
+                val_batches += 1
                 # TODO: compute mAP
-
+	avg_val_loss = val_loss / max(val_batches, 1)
     # Save the trained model weights
+	print(
+            f"Epoch [{epoch+1}/{num_epochs}] | "
+            f"Train Loss: {avg_train_loss:.4f} | "
+            f"Val Loss: {avg_val_loss:.4f}"
+        )
     torch.save(model.state_dict(), "fasterrcnn_cadot.pth")
     print("Training finished, model saved as fasterrcnn_cadot.pth")
 

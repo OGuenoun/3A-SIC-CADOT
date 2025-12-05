@@ -52,8 +52,8 @@ class COCODataset(Dataset):
 
         for ann in anns:
             x, y, w, h = ann["bbox"]
-            boxes.append([x, y,x+w,x+h])
-            labels.append(self.catid2idx[ann["category_id"]])  # +1, 0 reserved for background
+            boxes.append([x, y, x + w, x + h])
+            labels.append(self.catid2idx[ann["category_id"]])
             areas.append(ann.get("area", w * h))
             iscrowd.append(ann.get("iscrowd", 0))
 
@@ -77,14 +77,15 @@ class COCODataset(Dataset):
 
 
 def get_transform(train=True):
-    # Very simple transforms to start; you can add more later
     transforms = []
     transforms.append(F.to_tensor)
+
     def apply(img):
         t = img
         for tf in transforms:
             t = tf(t)
         return t
+
     return apply
 
 
@@ -96,14 +97,14 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Using device:", device)
 
-    data_root = "/bettik/PROJECTS/pr-material-acceleration/guenouno/data/data_augmented/train/"  # change if needed
+    data_root = "/bettik/PROJECTS/pr-material-acceleration/guenouno/data/data_augmented/train/"
 
     train_dataset = COCODataset(
         img_dir=data_root,
         ann_file=os.path.join(data_root, "annotations_train_augmented.json"),
         transforms=get_transform(train=True),
     )
-    val_root="/bettik/PROJECTS/pr-material-acceleration/guenouno/data/valid"
+    val_root = "/bettik/PROJECTS/pr-material-acceleration/guenouno/data/valid"
     val_dataset = COCODataset(
         img_dir=val_root,
         ann_file=os.path.join(val_root, "_annotations.coco.json"),
@@ -117,11 +118,10 @@ def main():
         val_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn
     )
 
-    num_classes = len(train_dataset.categories) + 1  # + background
+    num_classes = len(train_dataset.categories) + 1
 
-    # Load Faster R-CNN pre-trained on COCO
     model = fasterrcnn_resnet50_fpn(weights="COCO_V1")
-    # Replace head for CADOT num_classes
+
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = \
         torchvision.models.detection.faster_rcnn.FastRCNNPredictor(
@@ -130,7 +130,6 @@ def main():
 
     model.to(device)
 
-    # Optimizer
     params = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.SGD(params, lr=0.005, momentum=0.9, weight_decay=0.0005)
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
@@ -140,43 +139,48 @@ def main():
     for epoch in range(num_epochs):
         model.train()
         epoch_loss = 0.0
+        batches = 0
 
-	batches = 0
-        
-	for images, targets in train_loader:
+        for images, targets in train_loader:
             images = list(img.to(device) for img in images)
             targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
             loss_dict = model(images, targets)
             losses = sum(loss for loss in loss_dict.values())
             loss_value = losses.item()
+
             epoch_loss += loss_value
-	    batches+=1
+            batches += 1
+
             optimizer.zero_grad()
             losses.backward()
             optimizer.step()
-	avg_train_loss=train_loss/max(batches,1)
+
+        avg_train_loss = epoch_loss / max(batches, 1)
         lr_scheduler.step()
-	val_loss = 0.0
+
+        val_loss = 0.0
         val_batches = 0
-        # Simple validation loop: just forward & maybe later compute metrics
+
         model.eval()
         with torch.no_grad():
             for images, targets in val_loader:
                 images = [img.to(device) for img in images]
-		targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
-		loss_dict = model(images, targets)
+                targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
+
+                loss_dict = model(images, targets)
                 losses = sum(loss for loss in loss_dict.values())
-		val_loss += losses.item()
+                val_loss += losses.item()
                 val_batches += 1
-                # TODO: compute mAP
-	avg_val_loss = val_loss / max(val_batches, 1)
-    # Save the trained model weights
-	print(
+
+        avg_val_loss = val_loss / max(val_batches, 1)
+
+        print(
             f"Epoch [{epoch+1}/{num_epochs}] | "
             f"Train Loss: {avg_train_loss:.4f} | "
             f"Val Loss: {avg_val_loss:.4f}"
         )
+
     torch.save(model.state_dict(), "fasterrcnn_cadot.pth")
     print("Training finished, model saved as fasterrcnn_cadot.pth")
 

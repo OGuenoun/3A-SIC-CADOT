@@ -144,9 +144,11 @@ def main():
         for images, targets in train_loader:
             images = list(img.to(device) for img in images)
             targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
-            if any(t["boxes"].numel()==0 for t in targets):
-		print("Empty boxes batch")
-		continue
+
+            if any(t["boxes"].numel() == 0 for t in targets):
+                print("Empty boxes batch")
+                continue
+
             loss_dict = model(images, targets)
             losses = sum(loss for loss in loss_dict.values())
             loss_value = losses.item()
@@ -169,9 +171,11 @@ def main():
             for images, targets in val_loader:
                 images = [img.to(device) for img in images]
                 targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
-		if any(t["boxes"].numel()==0 for t in targets):
-                   print("Empty boxes batch")
-                   continue
+
+                if any(t["boxes"].numel() == 0 for t in targets):
+                    print("Empty boxes batch")
+                    continue
+
                 loss_dict = model(images, targets)
                 losses = sum(loss for loss in loss_dict.values())
                 val_loss += losses.item()

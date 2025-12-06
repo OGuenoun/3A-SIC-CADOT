@@ -52,7 +52,7 @@ class COCODataset(Dataset):
 
         for ann in anns:
             x, y, w, h = ann["bbox"]
-            boxes.append([x, y, x + w, x + h])
+            boxes.append([x, y, x + w, y + h])
             labels.append(self.catid2idx[ann["category_id"]])
             areas.append(ann.get("area", w * h))
             iscrowd.append(ann.get("iscrowd", 0))
@@ -97,7 +97,7 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Using device:", device)
 
-    data_root = "/bettik/PROJECTS/pr-material-acceleration/guenouno/data/data_augmented/train/"
+    data_root = "/bettik/PROJECTS/pr-material-acceleration/guenouno/data/data_augmented_coco/images_patched/"
 
     train_dataset = COCODataset(
         img_dir=data_root,
@@ -144,7 +144,9 @@ def main():
         for images, targets in train_loader:
             images = list(img.to(device) for img in images)
             targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
-
+            if any(t["boxes"].numel()==0 for t in targets):
+		print("Empty boxes batch")
+		continue
             loss_dict = model(images, targets)
             losses = sum(loss for loss in loss_dict.values())
             loss_value = losses.item()
@@ -167,7 +169,9 @@ def main():
             for images, targets in val_loader:
                 images = [img.to(device) for img in images]
                 targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
-
+		if any(t["boxes"].numel()==0 for t in targets):
+                   print("Empty boxes batch")
+                   continue
                 loss_dict = model(images, targets)
                 losses = sum(loss for loss in loss_dict.values())
                 val_loss += losses.item()

@@ -175,4 +175,12 @@ if __name__ == "__main__":
 
     print("===== mAP results on validation set =====")
     for k, v in metrics.items():
-        print(f"{k}: {float(v):.4f}")
+        if isinstance(v, torch.Tensor):
+            if v.numel() == 1:
+            # scalar tensor → safe to convert to float
+                print(f"{k}: {v.item():.4f}")
+            else:
+            # vector tensor (per-class metrics, etc.)
+                print(f"{k}: {v}")
+        else:
+            print(f"{k}: {v}")

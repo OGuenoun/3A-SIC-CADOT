@@ -157,11 +157,10 @@ def paste_rect_smooth(bg, patch, x, y, edge_frac=0.10):
 
     roi = bg[y:y+ph, x:x+pw]
 
-    patch_cm = match_color_LAB_rect(patch, roi)
 
     alpha = make_soft_rect_mask(ph, pw, edge_frac=edge_frac)[:, :, None]  # HxWx1
 
-    comp = (alpha * patch_cm.astype(np.float32) +
+    comp = (alpha * patch.astype(np.float32) +
             (1 - alpha) * roi.astype(np.float32)).astype(np.uint8)
 
     out = bg.copy()

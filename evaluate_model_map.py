@@ -96,7 +96,7 @@ def collate_fn(batch):
 def build_model(num_classes: int):
     # Use weights=None for backbone if you trained from scratch;
     # If you trained starting from COCO weights, you can keep COCO_V1.
-    model = fasterrcnn_resnet50_fpn(weights="COCO_V1")
+    model = fasterrcnn_resnet50_fpn(weights="DEFAULT")
 
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)

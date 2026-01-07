@@ -27,10 +27,10 @@ class COCODataset(Dataset):
             img_id = ann["image_id"]
             self.anns_by_img.setdefault(img_id, []).append(ann)
 
-        # map category ids to 0..N-1
+        # map category ids to 1..N (0 is background in torchvision detection)
         cat_ids = [c["id"] for c in self.categories]
         cat_ids_sorted = sorted(cat_ids)
-        self.catid2idx = {cid: i for i, cid in enumerate(cat_ids_sorted)}
+        self.catid2label = {cid: i + 1 for i, cid in enumerate(cat_ids_sorted)}  # <-- FIX
 
     def __len__(self):
         return len(self.images)
@@ -52,20 +52,29 @@ class COCODataset(Dataset):
 
         for ann in anns:
             x, y, w, h = ann["bbox"]
+            if w <= 1 or h <= 1:
+                continue
             boxes.append([x, y, x + w, y + h])
-            labels.append(self.catid2idx[ann["category_id"]])
+            labels.append(self.catid2label[ann["category_id"]])  # <-- FIX (labels start at 1)
             areas.append(ann.get("area", w * h))
             iscrowd.append(ann.get("iscrowd", 0))
 
-        boxes = torch.as_tensor(boxes, dtype=torch.float32)
-        labels = torch.as_tensor(labels, dtype=torch.int64)
-        areas = torch.as_tensor(areas, dtype=torch.float32)
-        iscrowd = torch.as_tensor(iscrowd, dtype=torch.int64)
+        # Handle images with no valid boxes
+        if len(boxes) == 0:
+            boxes = torch.zeros((0, 4), dtype=torch.float32)  # <-- FIX: correct empty shape
+            labels = torch.zeros((0,), dtype=torch.int64)
+            areas = torch.zeros((0,), dtype=torch.float32)
+            iscrowd = torch.zeros((0,), dtype=torch.int64)
+        else:
+            boxes = torch.as_tensor(boxes, dtype=torch.float32)
+            labels = torch.as_tensor(labels, dtype=torch.int64)
+            areas = torch.as_tensor(areas, dtype=torch.float32)
+            iscrowd = torch.as_tensor(iscrowd, dtype=torch.int64)
 
         target = {
             "boxes": boxes,
             "labels": labels,
-            "image_id": torch.tensor([img_id]),
+            "image_id": torch.tensor([img_id], dtype=torch.int64),
             "area": areas,
             "iscrowd": iscrowd,
         }
@@ -77,16 +86,8 @@ class COCODataset(Dataset):
 
 
 def get_transform(train=True):
-    transforms = []
-    transforms.append(F.to_tensor)
-
-    def apply(img):
-        t = img
-        for tf in transforms:
-            t = tf(t)
-        return t
-
-    return apply
+    # Minimal: just convert PIL -> Tensor
+    return F.to_tensor
 
 
 def collate_fn(batch):
@@ -97,14 +98,14 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Using device:", device)
 
-    data_root = "/bettik/PROJECTS/pr-material-acceleration/guenouno/data/data_augmented_coco/images_patched/"
+    data_root = "./images_patched/"
 
     train_dataset = COCODataset(
         img_dir=data_root,
         ann_file=os.path.join(data_root, "annotations_train_augmented.json"),
         transforms=get_transform(train=True),
     )
-    val_root = "/bettik/PROJECTS/pr-material-acceleration/guenouno/data/valid"
+    val_root = "./valid"
     val_dataset = COCODataset(
         img_dir=val_root,
         ann_file=os.path.join(val_root, "_annotations.coco.json"),
@@ -118,15 +119,17 @@ def main():
         val_dataset, batch_size=1, shuffle=False, collate_fn=collate_fn
     )
 
+    # categories count + background
     num_classes = len(train_dataset.categories) + 1
 
-    model = fasterrcnn_resnet50_fpn(weights="COCO_V1")
+    # NOTE: depending on torchvision version, weights="COCO_V1" might not exist.
+    # If it errors, replace with: weights="DEFAULT" or use Weights enum.
+    model = fasterrcnn_resnet50_fpn(weights="DEFAULT")
 
     in_features = model.roi_heads.box_predictor.cls_score.in_features
-    model.roi_heads.box_predictor = \
-        torchvision.models.detection.faster_rcnn.FastRCNNPredictor(
-            in_features, num_classes
-        )
+    model.roi_heads.box_predictor = torchvision.models.detection.faster_rcnn.FastRCNNPredictor(
+        in_features, num_classes
+    )
 
     model.to(device)
 
@@ -137,49 +140,54 @@ def main():
     num_epochs = 10
 
     for epoch in range(num_epochs):
+        # ---------------- TRAIN ----------------
         model.train()
         epoch_loss = 0.0
         batches = 0
 
         for images, targets in train_loader:
-            images = list(img.to(device) for img in images)
+            images = [img.to(device) for img in images]
             targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
+            # if empty boxes exist, you can either keep them (OK) or skip
+            # skipping is fine, but make sure it doesn't skip too much
             if any(t["boxes"].numel() == 0 for t in targets):
-                print("Empty boxes batch")
                 continue
 
-            loss_dict = model(images, targets)
-            losses = sum(loss for loss in loss_dict.values())
-            loss_value = losses.item()
+            loss_dict = model(images, targets)   # dict in train mode
+            losses = sum(loss_dict.values())
 
-            epoch_loss += loss_value
-            batches += 1
-
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
             losses.backward()
             optimizer.step()
+
+            epoch_loss += losses.item()
+            batches += 1
 
         avg_train_loss = epoch_loss / max(batches, 1)
         lr_scheduler.step()
 
+        # ---------------- VAL LOSS ----------------
+        # IMPORTANT: to get loss_dict you MUST be in train() mode.
+        # We'll do train() + no_grad() (no backprop) and then go back to eval().
+        model.train()  # <-- FIX: compute loss in train mode
         val_loss = 0.0
         val_batches = 0
 
-        model.eval()
         with torch.no_grad():
             for images, targets in val_loader:
                 images = [img.to(device) for img in images]
                 targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
                 if any(t["boxes"].numel() == 0 for t in targets):
-                    print("Empty boxes batch")
                     continue
 
-                loss_dict = model(images, targets)
-                losses = sum(loss for loss in loss_dict.values())
+                loss_dict = model(images, targets)  # dict because model is in train()
+                losses = sum(loss_dict.values())
                 val_loss += losses.item()
                 val_batches += 1
+
+        model.eval()  # put it back if you later want prediction-style eval
 
         avg_val_loss = val_loss / max(val_batches, 1)
 

@@ -25,11 +25,11 @@ from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 # -----------------------------
 @dataclass
 class CFG:
-    train_images_dir: str = "./images_patched/"
-    train_ann_json: str = "./images_patched/annotations_train_augmented.json"
+    train_images_dir: str = "/bettik/PROJECTS/pr-material-acceleration/guenouno/data/train"
+    train_ann_json: str = "/bettik/PROJECTS/pr-material-acceleration/guenouno/data/train/_annotations.coco.json"
 
-    val_images_dir: str = "./valid/"
-    val_ann_json: str = "./valid/_annotations.coco.json"
+    val_images_dir: str = "/bettik/PROJECTS/pr-material-acceleration/guenouno/data/valid"
+    val_ann_json: str = "/bettik/PROJECTS/pr-material-acceleration/guenouno/data/valid/_annotations.coco.json"
 
     num_workers: int = 4
     batch_size: int = 2

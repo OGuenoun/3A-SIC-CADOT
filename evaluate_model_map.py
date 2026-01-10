@@ -197,9 +197,9 @@ if __name__ == "__main__":
     print("Using device:", device)
 
     # ---- paths (EDIT THESE) ----
-    val_root = "./valid"  # set to your images root used by file_name in JSON
+    val_root = "/bettik/PROJECTS/pr-material-acceleration/guenouno/data/valid"  # set to your images root used by file_name in JSON
     val_ann = os.path.join(val_root, "_annotations.coco.json")
-    checkpoint_path = "./fasterrcnn_cadot.pth"
+    checkpoint_path = "/home/guenouno/proj/3A-SIC-CADOT/checkpoints/fasterrcnn_best.pt"
 
     # ---- data ----
     val_dataset = COCODataset(

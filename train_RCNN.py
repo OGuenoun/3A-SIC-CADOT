@@ -31,6 +31,22 @@ class COCODataset(Dataset):
         cat_ids = [c["id"] for c in self.categories]
         cat_ids_sorted = sorted(cat_ids)
         self.catid2label = {cid: i + 1 for i, cid in enumerate(cat_ids_sorted)}  # <-- FIX
+	        # -------- FIX BROKEN file_name PATHS (ONCE) --------
+        for img in self.images:
+            fn = str(img["file_name"])
+
+            # normalize Windows → Unix
+            fn = fn.replace("\\", "/")
+
+            # remove bad prefixes
+            fn = fn.replace("../images_patched/", "")
+            fn = fn.replace("images/patched/", "")
+            fn = fn.replace("images_patched/", "")
+            fn = fn.replace("images/", "")
+
+            # keep filename only
+            img["file_name"] = os.path.basename(fn)
+        # ---------------------------------------------------
 
     def __len__(self):
         return len(self.images)
@@ -98,14 +114,14 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Using device:", device)
 
-    data_root = "./images_patched/"
+    data_root = "/bettik/PROJECTS/pr-material-acceleration/guenouno/data/images_patched"
 
     train_dataset = COCODataset(
         img_dir=data_root,
         ann_file=os.path.join(data_root, "annotations_train_augmented.json"),
         transforms=get_transform(train=True),
     )
-    val_root = "./valid"
+    val_root = "/bettik/PROJECTS/pr-material-acceleration/guenouno/data/valid"
     val_dataset = COCODataset(
         img_dir=val_root,
         ann_file=os.path.join(val_root, "_annotations.coco.json"),
@@ -197,7 +213,7 @@ def main():
             f"Val Loss: {avg_val_loss:.4f}"
         )
 
-    torch.save(model.state_dict(), "fasterrcnn_cadot.pth")
+    torch.save(model.state_dict(), "fasterrcnn_cadot_aug_patches.pth")
     print("Training finished, model saved as fasterrcnn_cadot.pth")
 
 

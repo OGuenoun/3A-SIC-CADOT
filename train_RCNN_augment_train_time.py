@@ -114,9 +114,18 @@ class CocoDetectionRareAug(torch.utils.data.Dataset):
         self.coco_ds = CocoDetection(img_dir, ann_json)
         self.coco = self.coco_ds.coco
 
-        cat_ids = sorted(self.coco.getCatIds())
-        # IMPORTANT: labels must start at 1 (0 is background)
+        # Build mapping from the JSON categories (same as your second code)
+        import json as _json
+        with open(ann_json, "r") as f:
+            coco_json = _json.load(f)
+
+        cat_ids = sorted([c["id"] for c in coco_json["categories"]])
+
+        # OPTIONAL but often needed: if your JSON contains category_id=0 as "background", drop it
+        cat_ids = [cid for cid in cat_ids if cid != 0]
+
         self.catid2label = {cid: i + 1 for i, cid in enumerate(cat_ids)}
+        self.label2catid = {v: k for k, v in self.catid2label.items()}  # <-- key for evaluation
 
         self.base_tf = base_tf
         self.rare_tf = rare_tf

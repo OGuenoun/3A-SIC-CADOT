@@ -121,9 +121,7 @@ class CocoDetectionRareAug(torch.utils.data.Dataset):
 
         cat_ids = sorted([c["id"] for c in coco_json["categories"]])
 
-        # OPTIONAL but often needed: if your JSON contains category_id=0 as "background", drop it
-        cat_ids = [cid for cid in cat_ids if cid != 0]
-
+# IMPORTANT: in your dataset, category_id=0 is a REAL class (not background) -> do NOT drop it
         self.catid2label = {cid: i + 1 for i, cid in enumerate(cat_ids)}
         self.label2catid = {v: k for k, v in self.catid2label.items()}  # <-- key for evaluation
 

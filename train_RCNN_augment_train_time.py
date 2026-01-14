@@ -81,22 +81,22 @@ def make_base_train_tf():
     ])
 
 
+
 def make_rare_train_tf():
     return T.Compose([
         T.ToImage(),
         T.ToDtype(torch.float32, scale=True),
         T.RandomHorizontalFlip(p=0.7),
-        T.RandomShortestSize(min_size=[480, 512, 544, 576, 608, 640, 704], max_size=1024),
         T.ColorJitter(brightness=0.25, contrast=0.25, saturation=0.25, hue=0.06),
         T.RandomApply([T.GaussianBlur(kernel_size=3)], p=0.15),
     ])
+
 
 
 def make_val_tf():
     return T.Compose([
         T.ToImage(),
         T.ToDtype(torch.float32, scale=True),
-        T.RandomShortestSize(min_size=640, max_size=1024),
     ])
 
 

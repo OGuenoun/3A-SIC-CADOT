@@ -1,0 +1,25 @@
+# CADOT dataset (custom split)
+path: /bettik/PROJECTS/pr-material-acceleration/bouletta/Yolo/data/dataCadot_SPLIT
+
+train: images/train
+val: images/val
+test: images/test
+
+nc: 14
+
+
+names:
+  0: "basketball field"
+  1: "building"
+  2: "crosswalk"
+  3: "football field"
+  4: "graveyard"
+  5: "large vehicle"
+  6: "medium vehicle"
+  7: "playground"
+  8: "roundabout"
+  9: "ship"
+  10: "small vehicle"
+  11: "swimming pool"
+  12: "tennis court"
+  13: "train"
